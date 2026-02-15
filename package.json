@@ -3,6 +3,6 @@
     "@google/gemini-cli": "^0.28.2"
   },
   "scripts": {
-    "build": "bash backend/build.sh"
+    "vercel-build": "pip install -r backend/requirements-build.txt && python scripts/prepare_model.py backend"
   }
 }
