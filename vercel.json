@@ -2,16 +2,9 @@
   "version": 2,
   "builds": [
     {
-      "src": "backend/main.py",
-      "use": "@vercel/python",
-      "config": {
-        "buildCommand": "echo '=== BUILD DEBUG ===' && pwd && ls -la && mkdir -p api/clip_model && echo 'test file' > api/clip_model/test.txt && ls -la api/"
-      }
+      "src": "build_all.sh",
+      "use": "@vercel/python"
     },
-    {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build"
-    }
   ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "backend/main.py" },

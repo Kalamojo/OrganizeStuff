@@ -2,7 +2,7 @@
 # Exit immediately if a command exits with a non-zero status.
 set -e
 
-echo "--- VERCEL BUILD SCRIPT START ---"
+echo "--- VERCEL BUILD SCRIPT START PLEASE ---"
 
 # 3. Prepare Backend Assets (Models and Tokenizer)
 echo "--- Preparing backend assets ---"
