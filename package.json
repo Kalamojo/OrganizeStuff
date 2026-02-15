@@ -1,9 +1,7 @@
 {
-  "dependencies": {
-    "@google/gemini-cli": "^0.28.2"
-  },
   "scripts": {
-    "build": "npm run build:frontend",
-    "build:frontend": "echo '--- Building frontend ---' && cd frontend && npm install && npm run build && cd .. && echo '--- Moving frontend output to /public ---' && mv frontend/dist public"
+    "build": "echo '--- VERCEL BUILD SCRIPT START ---' && npm run build:frontend && npm run build:backend && echo '--- VERCEL BUILD SCRIPT COMPLETE ---'",
+    "build:frontend": "echo '--- Building frontend ---' && cd frontend && npm install && npm run build && cd .. && echo '--- Moving frontend output to /public ---' && mv frontend/dist public",
+    "build:backend": "echo '--- Preparing backend assets ---' && mkdir -p /tmp/build && pip install --break-system-packages --target=/tmp/build -r backend/requirements-build.txt && PYTHONPATH=/tmp/build python scripts/prepare_model.py api && rm -rf /tmp/build ~/.cache && echo 'Build deps cleaned'"
   }
 }
