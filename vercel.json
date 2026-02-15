@@ -16,5 +16,6 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "backend/main.py" },
     { "source": "/(.*)", "destination": "/frontend/index.html" }
+    { "source": "/assets/(.*)", "destination": "/frontend/assets/$1" },
   ]
 }
