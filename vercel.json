@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "buildCommand": "bash build_all.sh",
   "builds": [
     {
       "src": "public",
