@@ -7,7 +7,7 @@
     },
     {
       "src": "build_all.sh",
-      "use": "@vercel/static-build"
+      "use": "@vercel/python"
     }
   ],
   "rewrites": [
