@@ -3,7 +3,7 @@ import os
 # 1. CRITICAL: Disable Xet to prevent read-only file system errors
 os.environ["HF_HUB_DISABLE_XET"] = "1"
 # 2. Redirect the home/cache directory to Vercel's writable /tmp
-os.environ["HF_HOME"] = "/tmp"
+os.environ["HOME"] = "/tmp"
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -34,7 +34,6 @@ def load_model_from_hf(filename):
             repo_id="Kalamojo/cluster-bandits",
             filename=filename,
             local_dir="/tmp",
-            local_dir_use_symlinks=False,
             token=os.environ.get("HF_TOKEN") # Use a Vercel Env Var for private repos
         )
     return target_path
