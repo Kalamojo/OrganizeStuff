@@ -31,4 +31,28 @@ export const api = {
     const response = await axios.post(`${API_BASE}/recluster`);
     return response.data;
   },
+
+  // Add image item
+  addImageItem: async (imageUrl: string, metadata?: string) => {
+    const response = await axios.post(`${API_BASE}/embed_image`, {
+      image_url: imageUrl,
+      metadata,
+    });
+    return response.data;
+  },
+
+  // Add URL/bookmark item
+  addUrlItem: async (url: string, metadata?: string) => {
+    const response = await axios.post(`${API_BASE}/embed_url`, {
+      url: url,
+      metadata,
+    });
+    return response.data;
+  },
+
+  // Reset all items
+  resetAll: async () => {
+    const response = await axios.post(`${API_BASE}/reset`);
+    return response.data;
+  },
 };

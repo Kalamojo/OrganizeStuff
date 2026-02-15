@@ -15,8 +15,30 @@ function ClusterGroup({ data }: { data: ClusterGroupData }) {
         display: 'flex',
         flexDirection: 'column',
         pointerEvents: 'none',
+        position: 'relative',
       }}
     >
+      {/* Drag handle in corner */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '5px',
+          right: '5px',
+          width: '20px',
+          height: '20px',
+          cursor: 'move',
+          pointerEvents: 'all',
+          opacity: 0.3,
+          fontSize: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: data.color,
+        }}
+        title="Drag to move cluster"
+      >
+        ⠿
+      </div>
       <div
         style={{
           fontSize: '20px',
@@ -32,9 +54,17 @@ function ClusterGroup({ data }: { data: ClusterGroupData }) {
         style={{
           fontSize: '14px',
           color: '#666',
+          transition: 'all 0.3s ease-in-out',
         }}
       >
-        {data.size} items
+        <span
+          style={{
+            display: 'inline-block',
+            transition: 'transform 0.3s ease-in-out',
+          }}
+        >
+          {data.size} items
+        </span>
       </div>
     </div>
   );

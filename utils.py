@@ -54,7 +54,7 @@ def format_vw_adf_string(cm, item_features: np.ndarray, actions: List[dict], cb_
         
     return vw_string.strip()
 
-def predict_cluster(workspace: vw.Workspace, parser: vw.TextFormatParser, 
+def predict_cluster(workspace: vw.Workspace, parser: vw.TextFormatParser,
                     cm, item_idx: int, item_features: np.ndarray, learn: bool = True) -> Tuple[dict, float, List[dict]]:
     """
     Fetches the available clusters, formats the context, and asks VW to predict the best fit.
@@ -87,9 +87,9 @@ def predict_cluster(workspace: vw.Workspace, parser: vw.TextFormatParser,
         #     cm.assign_item(item_idx, cluster_id)
 
         cost = calculate_cost(cm, item_features, chosen_action["id"], is_new)
-        
+
         # Learn with HIGH cost for new clusters to discourage them
-        learn_and_update(workspace, parser, cm, item_idx, item_features, 
+        learn_and_update(workspace, parser, cm, item_idx, item_features,
                         actions, chosen_action["id"], prob, cost, is_new)
 
     
@@ -125,8 +125,8 @@ def learn_and_update(workspace: vw.Workspace, parser: vw.TextFormatParser, cm,
     # # 3. Clean up empty clusters and update medoids based on new assignments
     # cm.balance_clusters()
 
-def apply_human_correction(workspace: vw.Workspace, parser: vw.TextFormatParser, cm, 
-                           item_idx: int, correct_cluster_id: str):
+def apply_human_correction(workspace: vw.Workspace, parser: vw.TextFormatParser, cm,
+                           item_idx: int, correct_cluster_id: str, cost_penalty: float = -2.0):
     """
     Simulates a human forcing an item into a specific cluster (Mechanism 2/3).
     Applies a maximum negative cost (high reward) to strictly guide the model.
@@ -143,43 +143,38 @@ def apply_human_correction(workspace: vw.Workspace, parser: vw.TextFormatParser,
         is_new_correct_cluster = True
         correct_cluster_id = cm.get_new_cluster_id()
 
-    correct_prob = 0.0
-    for idx, action in enumerate(actions):
-        if action["id"] == correct_cluster_id:
-            # pmf is a list of tuples: [(action_idx, probability), ...]
-            correct_prob = next(p for i, p in pmf if i == idx)
-            break
+    # correct_prob = 0.0
+    # for idx, action in enumerate(actions):
+    #     if action["id"] == correct_cluster_id:
+    #         # pmf is a list of tuples: [(action_idx, probability), ...]
+    #         correct_prob = next(p for i, p in pmf if i == idx)
+    #         break
     
     # VERY HIGH REWARD for user corrections - this is the key to making them stick!
     # Regular predictions use costs in [0, 1.2] range
     # Corrections use -100.0 to make them MUCH more valuable than accumulated evidence
-    cost = -5.0
     prob = 1.0  # Force full exploration weight for corrections (not model's prob)
 
     # # Create new cluster if requested
     # if is_new_correct_cluster:
     #     _ = cm.add_cluster(item_features, correct_cluster_id)
 
-    # Single learning pass with massive -100.0 reward signal
+    # Single learning pass with strong reward signal
     # This should be strong enough to dominate regular predictions
     learn_and_update(workspace, parser, cm, item_idx, item_features, actions,
-                     correct_cluster_id, prob, cost, is_new_correct_cluster)
+                     correct_cluster_id, prob, cost_penalty, is_new_correct_cluster)
 
     return correct_cluster_id
 
-def calculate_cost(cm, item_features, chosen_cluster_id, is_new: bool, new_cluster_penalty=0.3, spatial_scale=0.5, size_scale=0.2):
+def calculate_cost(cm, item_features, chosen_cluster_id, is_new: bool, new_cluster_penalty=0.3, spatial_scale=3.0, size_scale=0.2):
     """
     Cost function for VW contextual bandit learning.
 
     **Cost Scale Design:**
-    - Regular predictions: [0.0, 1.2] (penalties, model learns to minimize)
+    - Regular predictions: [0.0, ~5.0] (penalties, model learns to minimize)
       - New cluster: 0.3 penalty
-      - Existing cluster: 0.0-1.2 (spatial + size penalties)
-    - User corrections: -100.0 (HUGE reward, ~100x more valuable than avoiding penalties)
-
-    This massive gap ensures corrections dominate accumulated evidence from regular predictions.
-    If the distance to an existing cluster is too large, the bandit accepts the 0.3 penalty
-    and creates a new cluster. Otherwise, it merges into an existing cluster.
+      - Existing cluster: 0.0-5.0 (spatial + size penalties, higher spatial_scale)
+    - User corrections: -2.0 (reward, must be weaker than spatial penalties)
     """
     # Handle new cluster case
     if is_new:
@@ -187,12 +182,18 @@ def calculate_cost(cm, item_features, chosen_cluster_id, is_new: bool, new_clust
 
     # It joined an existing cluster. Cost is the Euclidean Distance.
     medoid = cm.get_cluster_medoid(chosen_cluster_id)
-    spatial_cost = min(np.linalg.norm(item_features - medoid) * spatial_scale, 1.0)  # Cap at 1.0
+
+    # Handle dimension mismatch (old 2D medoids vs new 512D embeddings)
+    if item_features.shape != medoid.shape:
+        print(f"⚠️ Dimension mismatch: item {item_features.shape} vs medoid {medoid.shape}. Using default cost.")
+        spatial_cost = 2.0  # Default mid-range cost
+    else:
+        spatial_cost = min(np.linalg.norm(item_features - medoid) * spatial_scale, 5.0)  # Cap at 5.0
 
     cluster_size = cm.clusters[chosen_cluster_id].size
     size_penalty = (cluster_size / len(cm.item_to_cluster)) * size_scale  # Max 0.2
 
-    return spatial_cost + size_penalty  # Range: [0.0, 1.2] but typically [0.0, 0.8]
+    return spatial_cost + size_penalty  # Range: [0.0, ~5.2]
 
 def get_confidence_margin(pmf, chosen_idx):
     """Calculate margin between chosen action and next best."""
@@ -204,20 +205,34 @@ def get_confidence_margin(pmf, chosen_idx):
         return probs[0][1] - probs[1][1]  # Top minus 2nd place
     return 1.0  # Sole option = maximum confidence
 
-def full_cluster_propagation_dash(workspace, parser, cm, items):
+def full_cluster_propagation_dash(workspace, parser, cm, items, margin_gap: float = 0.15, skip_item_ids=None):
     """
     FULL PROPAGATION with MARGIN-BASED confidence. Updates only when
     top prediction beats 2nd-place by >10% margin AND cluster changes.
+
+    Args:
+        skip_item_ids: Set of item IDs to skip (all manually corrected items)
     """
     item_ids = list(items.keys())
     if not item_ids:
         return items
 
-    print(f"🔄 Propagating {len(item_ids)} points globally...")
+    if skip_item_ids is None:
+        skip_item_ids = set()
+
+    print(f"🔄 Propagating {len(item_ids)} points globally (skipping {len(skip_item_ids)} corrected items)...")
     updates_made = 0
+    cluster_exits = {}  # Track how many items are leaving each cluster
 
     for item_id in item_ids:
-        features = np.array(items[item_id]['features'])
+        # Skip all manually corrected items to preserve user corrections
+        if item_id in skip_item_ids:
+            continue
+        # Use full embedding for clustering, not 2D projection
+        if 'full_embedding' in items[item_id] and items[item_id]['full_embedding'] is not None:
+            features = np.array(items[item_id]['full_embedding'])
+        else:
+            features = np.array(items[item_id]['features'])
         old_cluster = items[item_id]['cluster']
         #print("cm clusters right before propogate:", cm.clusters)
         
@@ -226,21 +241,31 @@ def full_cluster_propagation_dash(workspace, parser, cm, items):
             workspace, parser, cm, item_id, features, learn=False
         )
         updated_cluster = chosen_action["id"]
-        
+
         # 2. MARGIN CHECK: Top must beat 2nd by 10%
         margin = get_confidence_margin(pmf, chosen_idx)
 
-        if (old_cluster != updated_cluster and margin > 0.10):  # 10% lead over next-best
-            #print("item", item_id, "clusters before:", cm.clusters)
-            # if is_new_cluster:
-            #     print("first off, should not be getting here")
-            #     print(is_new_cluster, chosen_action)
-                
-            #     cm.assign_item(item_id, cluster_id)
-            #print("item", item_id, "clusters mid:", cm.clusters)
-
+        if (old_cluster != updated_cluster and margin > margin_gap):  # 10% lead over next-best
+            # Calculate base cost
             cost = calculate_cost(cm, features, updated_cluster, is_new_cluster)
-            learn_and_update(workspace, parser, cm, item_id, features, 
+
+            # Add exodus penalty: if many items already left old_cluster, add cost
+            # This creates cluster stability - prevents mass exodus
+            exits_from_old = cluster_exits.get(old_cluster, 0)
+            old_cluster_obj = cm.clusters.get(old_cluster)
+            if old_cluster_obj is not None and old_cluster_obj.size > 0:
+                exodus_ratio = exits_from_old / old_cluster_obj.size
+                # Penalty scales with % of cluster that's leaving
+                # e.g., if 50% have left, add 0.25 penalty
+                exodus_penalty = exodus_ratio * 0.5
+                cost += exodus_penalty
+                if exodus_penalty > 0.1:
+                    print(f"  ⚠️ Exodus penalty: {exodus_penalty:.2f} ({exits_from_old}/{old_cluster_obj.size} left {old_cluster})")
+
+            # Track that this item is leaving old_cluster
+            cluster_exits[old_cluster] = exits_from_old + 1
+
+            learn_and_update(workspace, parser, cm, item_id, features,
                            actions, updated_cluster, prob, cost, is_new_cluster)
             #print("item", item_id, "clusters after:", cm.clusters)
             items[item_id]['cluster'] = updated_cluster

@@ -3,6 +3,9 @@ export interface Item {
   features: number[];
   cluster: string;
   metadata: string;
+  image_url?: string;
+  full_embedding?: number[];
+  url?: string;
 }
 
 export interface ItemsResponse {

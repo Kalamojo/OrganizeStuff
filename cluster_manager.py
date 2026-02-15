@@ -93,9 +93,19 @@ class ClusterManager:
             if cluster.members:
                 arr_list = []
                 for item_idx in cluster.members:
-                    arr_list.append(self.item_to_embedding[item_idx])
-                member_array = np.stack(arr_list)  # Shape: (n_members, n_dims)
-                self.clusters[cluster.id].medoid = np.mean(member_array, axis=0)
+                    if item_idx in self.item_to_embedding:
+                        arr_list.append(self.item_to_embedding[item_idx])
+
+                if arr_list:
+                    try:
+                        member_array = np.stack(arr_list)  # Shape: (n_members, n_dims)
+                        self.clusters[cluster.id].medoid = np.mean(member_array, axis=0)
+                    except ValueError as e:
+                        # Mixed dimensions - skip updating this cluster's medoid
+                        print(f"⚠️ Cluster {cluster.id} has mixed dimensions, skipping medoid update")
+                        pass
+                else:
+                    to_remove.append(cluster.id)
             else:
                 to_remove.append(cluster.id)
 
