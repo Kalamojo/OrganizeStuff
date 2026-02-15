@@ -1,20 +1,10 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
+  "buildCommand": "pip install -r backend/requirements-build.txt && python scripts/prepare_model.py api",
+  "installCommand": "pip install -r backend/requirements.txt",
   "builds": [
-    {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build"
-    },
-    {
-      "src": "backend/main.py",
-      "use": "@vercel/python",
-      "config": {
-        "includeFiles": [
-          "backend/clip_model/**"
-        ]
-      }
-    }
+    { "src": "frontend/package.json", "use": "@vercel/static-build" },
+    { "src": "backend/main.py", "use": "@vercel/python" }
   ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "backend/main.py" },
