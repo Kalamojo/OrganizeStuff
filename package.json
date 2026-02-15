@@ -5,6 +5,6 @@
   "scripts": {
     "build": "echo '--- VERCEL BUILD SCRIPT START ---' && npm run build:frontend && npm run build:backend && echo '--- VERCEL BUILD SCRIPT COMPLETE ---'",
     "build:frontend": "echo '--- Building frontend ---' && cd frontend && npm install && npm run build && cd .. && echo '--- Moving frontend output to /public ---' && mv frontend/dist public",
-    "build:backend": "echo '--- Preparing backend assets ---' && pip install -r backend/requirements-build.txt && python scripts/prepare_model.py api"
+    "build:backend": "echo '--- Preparing backend assets ---' && python scripts/prepare_model.py api"
   }
 }
