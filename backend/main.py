@@ -13,10 +13,10 @@ from bs4 import BeautifulSoup
 from huggingface_hub import hf_hub_download
 
 # --- Model Paths ---
-MODEL_DIR = os.path.join("api", "clip_model")
-TOKENIZER_PATH = os.path.join(MODEL_DIR, "tokenizer", "tokenizer.json")
-VISION_MODEL_PATH = os.path.join(MODEL_DIR, "clip_vision_quantized.onnx")
-TEXT_MODEL_PATH = os.path.join(MODEL_DIR, "clip_text_quantized.onnx")
+# MODEL_DIR = os.path.join("api", "clip_model")
+# TOKENIZER_PATH = os.path.join(MODEL_DIR, "tokenizer", "tokenizer.json")
+# VISION_MODEL_PATH = os.path.join(MODEL_DIR, "clip_vision_quantized.onnx")
+# TEXT_MODEL_PATH = os.path.join(MODEL_DIR, "clip_text_quantized.onnx")
 
 def load_model_from_hf(filename):
     # Path where Vercel allows writing
@@ -26,7 +26,7 @@ def load_model_from_hf(filename):
         print(f"Downloading {filename} from Hugging Face...")
         hf_hub_download(
             repo_id="Kalamojo/cluster-bandits",
-            filename=f"clip_model/{filename}",
+            filename=filename,
             local_dir="/tmp",
             token=os.environ.get("HF_TOKEN") # Use a Vercel Env Var for private repos
         )
