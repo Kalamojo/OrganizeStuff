@@ -8,4 +8,3 @@ dash-cytoscape>=1.0.0
 networkx
 beautifulsoup4
 html5lib
-
