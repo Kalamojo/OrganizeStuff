@@ -1,14 +1,25 @@
 {
   "version": 2,
-  "buildCommand": "pip install -r backend/requirements-build.txt && python scripts/prepare_model.py api",
-  "installCommand": "pip install -r backend/requirements.txt",
   "builds": [
-    { "src": "frontend/package.json", "use": "@vercel/static-build" },
-    { "src": "backend/main.py", "use": "@vercel/python" }
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "public"
+      }
+    },
+    {
+      "src": "backend/main.py",
+      "use": "@vercel/python",
+      "config": {
+        "buildCommand": "pip install -r backend/requirements-build.txt && python scripts/prepare_model.py api && pip install -r backend/requirements.txt",
+        "maxLambdaSize": "50mb"
+      }
+    }
   ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "backend/main.py" },
     { "source": "/assets/(.*)", "destination": "/frontend/assets/$1" },
-    { "source": "/(.*)", "destination": "/frontend/index.html" }
+    { "source": "/(.*)", "destination": "/public/index.html" }
   ]
 }
