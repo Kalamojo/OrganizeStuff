@@ -1,9 +1,19 @@
 import os
 
-# 1. CRITICAL: Disable Xet to prevent read-only file system errors
+# Put *all* HF caches in /tmp (writable on Vercel)
+os.environ["HF_HOME"] = "/tmp/huggingface"
+os.environ["HF_HUB_CACHE"] = "/tmp/huggingface/hub"
+os.environ["HF_XET_CACHE"] = "/tmp/huggingface/xet"
+os.environ["XDG_CACHE_HOME"] = "/tmp"
+
+# Try to disable Xet (see note below about version quirks)
 os.environ["HF_HUB_DISABLE_XET"] = "1"
-# 2. Redirect the home/cache directory to Vercel's writable /tmp
-os.environ["HOME"] = "/tmp"
+
+# Make sure dirs exist (prevents some “can’t write logs” failures)
+os.makedirs(os.environ["HF_HOME"], exist_ok=True)
+os.makedirs(os.environ["HF_HUB_CACHE"], exist_ok=True)
+os.makedirs(os.environ["HF_XET_CACHE"], exist_ok=True)
+
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
