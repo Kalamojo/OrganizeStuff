@@ -6,8 +6,11 @@
     { "src": "package.json", "use": "@vercel/static-build" },
     { "src": "backend/main.py", "use": "@vercel/python" }
   ],
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/backend/main.py" },
-    { "source": "/(.*)", "destination": "/index.html" }
+  "routes": [
+    { "handle": "filesystem" },
+
+    { "src": "^/api/(.*)$", "dest": "/backend/main.py" },
+
+    { "src": "^(.*)$", "dest": "/index.html" }
   ]
 }
