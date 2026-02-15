@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "npm run build",
+  "buildCommand": "build:frontend",
   "builds": [
     { "src": "package.json", "use": "@vercel/static-build" },
     { "src": "backend/main.py", "use": "@vercel/python" }

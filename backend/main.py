@@ -12,7 +12,7 @@ from tokenizers import Tokenizer
 from bs4 import BeautifulSoup
 
 # --- Model Paths ---
-MODEL_DIR = os.path.join("api", "clip_model")
+MODEL_DIR = os.path.join(".", "clip_model")
 TOKENIZER_PATH = os.path.join(MODEL_DIR, "tokenizer", "tokenizer.json")
 VISION_MODEL_PATH = os.path.join(MODEL_DIR, "clip_vision_quantized.onnx")
 TEXT_MODEL_PATH = os.path.join(MODEL_DIR, "clip_text_quantized.onnx")
