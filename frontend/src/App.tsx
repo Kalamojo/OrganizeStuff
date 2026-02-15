@@ -36,7 +36,11 @@ function App() {
   const [dragStartPos, setDragStartPos] = useState<{ x: number; y: number } | null>(null);
   const [imageUrl, setImageUrl] = useState<string>('');
   const [isAddingImage, setIsAddingImage] = useState(false);
+  const [bookmarkUrl, setBookmarkUrl] = useState<string>('');
+  const [isAddingUrl, setIsAddingUrl] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [changedItems] = useState<Set<number>>(new Set());
+  const [isPropagating, setIsPropagating] = useState(false);
 
   const updateUIFromState = (newItems: Record<string, Item>, newCmState: any) => {
     const itemArray = Object.values(newItems);
@@ -132,7 +136,6 @@ function App() {
         style: {
           transition: 'all 0.5s ease-in-out',
         },
-        // No extent allows dragging between clusters
       });
 
       clusterPos.count++;
@@ -150,16 +153,12 @@ function App() {
 
     setIsAddingImage(true);
     try {
-      // 1. Get embedding from Vercel
       const embeddedItem = await api.embedImage(imageUrl);
-      embeddedItem.id = Date.now(); // Assign a unique ID on the frontend
-      
-      // 2. Send to Cloudflare for clustering
+      embeddedItem.id = Date.now();
       const newState = await api.postToWorker('CLUSTER_ITEM', {
         state: { cm: cmState, items },
         item: embeddedItem,
       });
-
       updateUIFromState(newState.items, newState.cm);
       setImageUrl('');
     } catch (error) {
@@ -167,6 +166,94 @@ function App() {
       alert('Failed to add image. Make sure the URL is valid.');
     } finally {
       setIsAddingImage(false);
+    }
+  };
+
+  // Handle adding URL/bookmark
+  const handleAddUrl = async () => {
+    if (!bookmarkUrl.trim()) {
+      alert('Please enter a URL');
+      return;
+    }
+
+    setIsAddingUrl(true);
+    try {
+      const embeddedItem = await api.embedUrl(bookmarkUrl);
+      embeddedItem.id = Date.now();
+      const newState = await api.postToWorker('CLUSTER_ITEM', {
+        state: { cm: cmState, items },
+        item: embeddedItem,
+      });
+      updateUIFromState(newState.items, newState.cm);
+      setBookmarkUrl('');
+    } catch (error) {
+      console.error('Failed to add URL:', error);
+      alert('Failed to add URL. Make sure the URL is valid and accessible.');
+    } finally {
+      setIsAddingUrl(false);
+    }
+  };
+  
+  // Handle importing bookmarks from HTML file
+  const handleImportBookmarks = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    try {
+      const text = await file.text();
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(text, 'text/html');
+      const links = doc.querySelectorAll('a[href]');
+
+      const urls = Array.from(links)
+        .map(link => ({
+          url: link.getAttribute('href') || '',
+          title: link.textContent || ''
+        }))
+        .filter(item => item.url.startsWith('http'));
+
+      console.log(`Found ${urls.length} bookmarks`);
+
+      let successCount = 0;
+      let currentState = { cm: cmState, items };
+
+      for (let i = 0; i < urls.length; i++) {
+        try {
+          const embeddedItem = await api.embedUrl(urls[i].url, urls[i].title);
+          embeddedItem.id = Date.now() + i;
+          currentState = await api.postToWorker('CLUSTER_ITEM', {
+            state: currentState,
+            item: embeddedItem,
+          });
+          successCount++;
+          console.log(`Added ${i + 1}/${urls.length}: ${urls[i].title}`);
+          updateUIFromState(currentState.items, currentState.cm);
+        } catch (error) {
+          console.error(`Failed to add ${urls[i].url}:`, error);
+        }
+      }
+
+      alert(`Successfully imported ${successCount}/${urls.length} bookmarks!`);
+    } catch (error) {
+      console.error('Failed to import bookmarks:', error);
+      alert('Failed to import bookmarks. Make sure the file is a valid HTML bookmarks export.');
+    } finally {
+      setIsImporting(false);
+      event.target.value = '';
+    }
+  };
+
+  // Handle recluster
+  const handleRecluster = async () => {
+    try {
+        setIsPropagating(true);
+        const newState = await api.postToWorker('RECLUSTER', { state: { cm: cmState, items } });
+        updateUIFromState(newState.items, newState.cm);
+    } catch (error) {
+      console.error('Failed to recluster:', error);
+    } finally {
+        setIsPropagating(false);
     }
   };
 
@@ -194,14 +281,12 @@ function App() {
     async (_event: React.MouseEvent, node: Node) => {
       if (node.type !== 'item' || !draggedNode) return;
 
-      // Check if node actually moved (not just a click/double-click)
       if (dragStartPos) {
         const distance = Math.sqrt(
           Math.pow(node.position.x - dragStartPos.x, 2) +
           Math.pow(node.position.y - dragStartPos.y, 2)
         );
 
-        // If moved less than 10px, treat as click/double-click, not a drag
         if (distance < 10) {
           setDraggedNode(null);
           setDragStartPos(null);
@@ -209,10 +294,9 @@ function App() {
         }
       }
 
-      // Find which cluster the node is over
       let targetCluster: string | null = null;
       const nodeCenter = {
-        x: node.position.x + 30, // half of node width
+        x: node.position.x + 30,
         y: node.position.y + 30,
       };
 
@@ -250,7 +334,6 @@ function App() {
         console.error('Failed to apply correction:', error);
       }
 
-
       setDraggedNode(null);
       setDragStartPos(null);
     },
@@ -273,6 +356,11 @@ function App() {
       >
         <Background color="#333" gap={16} />
         <Controls />
+        {isPropagating && (
+          <div className="propagating-overlay">
+            🔄 Propagating changes...
+          </div>
+        )}
         <Panel position="top-left" style={{ margin: 20 }}>
           <div
             style={{
@@ -289,6 +377,20 @@ function App() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '15px' }}>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button
+                  onClick={handleRecluster}
+                  style={{
+                    padding: '10px 20px',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    backgroundColor: '#2196F3',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '5px',
+                  }}
+                >
+                  🔄 Recluster
+                </button>
+                <button
                   onClick={handleReset}
                   style={{
                     padding: '10px 20px',
@@ -302,6 +404,33 @@ function App() {
                 >
                   🗑️ Reset
                 </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <label
+                  htmlFor="bookmark-import"
+                  style={{
+                    padding: '10px 20px',
+                    fontSize: '14px',
+                    cursor: isImporting ? 'wait' : 'pointer',
+                    backgroundColor: isImporting ? '#666' : '#9C27B0',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '5px',
+                    display: 'inline-block',
+                    textAlign: 'center',
+                  }}
+                >
+                  {isImporting ? '⏳ Importing...' : '📚 Import Bookmarks'}
+                </label>
+                <input
+                  id="bookmark-import"
+                  type="file"
+                  accept=".html"
+                  onChange={handleImportBookmarks}
+                  disabled={isImporting}
+                  style={{ display: 'none' }}
+                />
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
@@ -337,6 +466,43 @@ function App() {
                     }}
                   >
                     {isAddingImage ? '⏳' : '📸 Add'}
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <label style={{ fontSize: '12px', color: '#b0b0b0' }}>🔗 Add URL/Bookmark:</label>
+                <div style={{ display: 'flex', gap: '5px' }}>
+                  <input
+                    type="text"
+                    value={bookmarkUrl}
+                    onChange={(e) => setBookmarkUrl(e.target.value)}
+                    placeholder="https://example.com/article"
+                    style={{
+                      flex: 1,
+                      padding: '8px',
+                      fontSize: '14px',
+                      border: '1px solid #555',
+                      borderRadius: '4px',
+                      backgroundColor: '#3d3d3d',
+                      color: '#fff',
+                    }}
+                    onKeyPress={(e) => e.key === 'Enter' && handleAddUrl()}
+                  />
+                  <button
+                    onClick={handleAddUrl}
+                    disabled={isAddingUrl}
+                    style={{
+                      padding: '8px 16px',
+                      fontSize: '14px',
+                      cursor: isAddingUrl ? 'wait' : 'pointer',
+                      backgroundColor: isAddingUrl ? '#ccc' : '#9C27B0',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                    }}
+                  >
+                    {isAddingUrl ? '⏳' : '🔖 Add'}
                   </button>
                 </div>
               </div>

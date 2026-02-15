@@ -13,6 +13,15 @@ export const api = {
     });
     return response.data;
   },
+
+  // Get embedding for a URL from the Vercel backend
+  embedUrl: async (url: string, metadata?: string): Promise<Item> => {
+    const response = await axios.post(`${VERCEL_API_BASE}/embed_url`, {
+      url: url,
+      metadata,
+    });
+    return response.data;
+  },
   
   // --- Clustering operations (to be handled by Cloudflare Worker) ---
 
