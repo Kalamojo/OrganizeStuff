@@ -7,7 +7,7 @@
       "config": { "distDir": "dist" }
     },
     {
-      "src": "backend/main.py",
+      "src": "backend/build.sh",
       "use": "@vercel/python"
     }
   ],

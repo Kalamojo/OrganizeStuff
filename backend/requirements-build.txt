@@ -1,0 +1,5 @@
+open-clip-torch
+torch
+huggingface_hub
+onnx
+onnxruntime

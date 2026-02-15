@@ -6,4 +6,4 @@ requests
 beautifulsoup4
 html5lib
 lxml
-# We are removing vowpal-wabbit and torch as they will not be used on Vercel
+
