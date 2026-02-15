@@ -1,13 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import ReactFlow, {
   Node,
-  Edge,
   Controls,
   Background,
   useNodesState,
   useEdgesState,
   NodeTypes,
-  OnNodeDrag,
+  NodeDragHandler,
   Panel,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -30,19 +29,18 @@ const CLUSTER_COLORS = [
 
 function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [edges, , onEdgesChange] = useEdgesState([]);
   const [items, setItems] = useState<Record<string, Item>>({});
   const [cmState, setCmState] = useState<any>({});
   const [draggedNode, setDraggedNode] = useState<Node | null>(null);
   const [dragStartPos, setDragStartPos] = useState<{ x: number; y: number } | null>(null);
   const [imageUrl, setImageUrl] = useState<string>('');
   const [isAddingImage, setIsAddingImage] = useState(false);
-  const [changedItems, setChangedItems] = useState<Set<number>>(new Set());
-  const [isPropagating, setIsPropagating] = useState(false);
+  const [changedItems] = useState<Set<number>>(new Set());
 
   const updateUIFromState = (newItems: Record<string, Item>, newCmState: any) => {
     const itemArray = Object.values(newItems);
-    const clusterSizes = Object.values(newCmState.clusters || {}).reduce((acc, c: any) => {
+    const clusterSizes = Object.values(newCmState.clusters || {}).reduce((acc: Record<string, number>, c: any) => {
         acc[c.id] = c.size;
         return acc;
     }, {});
@@ -184,7 +182,7 @@ function App() {
   };
 
   // Handle drag start
-  const onNodeDragStart: OnNodeDrag = useCallback((event, node) => {
+  const onNodeDragStart: NodeDragHandler = useCallback((_event, node) => {
     if (node.type === 'item') {
       setDraggedNode(node);
       setDragStartPos({ x: node.position.x, y: node.position.y });
@@ -193,7 +191,7 @@ function App() {
 
   // Handle drag stop - check if dropped on new cluster
   const onNodeDragStop = useCallback(
-    async (event, node) => {
+    async (_event: React.MouseEvent, node: Node) => {
       if (node.type !== 'item' || !draggedNode) return;
 
       // Check if node actually moved (not just a click/double-click)
@@ -274,12 +272,7 @@ function App() {
         maxZoom={1.5}
       >
         <Background color="#333" gap={16} />
-        <Controls style={{ button: { backgroundColor: '#2d2d2d', borderColor: '#555', color: '#fff' } }} />
-        {isPropagating && (
-          <div className="propagating-overlay">
-            🔄 Propagating changes...
-          </div>
-        )}
+        <Controls />
         <Panel position="top-left" style={{ margin: 20 }}>
           <div
             style={{
