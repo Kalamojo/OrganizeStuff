@@ -15,6 +15,10 @@ os.makedirs(os.environ["HF_HUB_CACHE"], exist_ok=True)
 os.makedirs(os.environ["HF_XET_CACHE"], exist_ok=True)
 
 
+# put this at the very top, before any HF imports
+from huggingface_hub.utils import logging as hf_logging
+hf_logging.set_verbosity_error()  # or set_verbosity_warning()
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
