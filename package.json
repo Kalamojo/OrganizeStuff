@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "build": "npm run build:backend",
-    "build:backend": "echo '--- Preparing backend assets ---' && mkdir -p /tmp/build && pip install --break-system-packages --target=/tmp/build -r backend/requirements-build.txt && PYTHONPATH=/tmp/build python scripts/prepare_model.py api && rm -rf /tmp/build ~/.cache && echo 'Build deps cleaned'"
+    "build": "npm run build:frontend",
+    "build:frontend": "echo '--- Building frontend ---' && cd frontend && npm install && npm run build && cd .. && echo '--- Moving frontend output to /public ---' && mv frontend/dist public"
   }
 }

@@ -10,12 +10,32 @@ from PIL import Image
 import onnxruntime as ort
 from tokenizers import Tokenizer
 from bs4 import BeautifulSoup
+from huggingface_hub import hf_hub_download
 
 # --- Model Paths ---
 MODEL_DIR = os.path.join("api", "clip_model")
 TOKENIZER_PATH = os.path.join(MODEL_DIR, "tokenizer", "tokenizer.json")
 VISION_MODEL_PATH = os.path.join(MODEL_DIR, "clip_vision_quantized.onnx")
 TEXT_MODEL_PATH = os.path.join(MODEL_DIR, "clip_text_quantized.onnx")
+
+def load_model_from_hf(filename):
+    # Path where Vercel allows writing
+    target_path = f"/tmp/{filename}"
+    
+    if not os.path.exists(target_path):
+        print(f"Downloading {filename} from Hugging Face...")
+        hf_hub_download(
+            repo_id="Kalamojo/cluster-bandits",
+            filename=f"clip_model/{filename}",
+            local_dir="/tmp",
+            token=os.environ.get("HF_TOKEN") # Use a Vercel Env Var for private repos
+        )
+    return target_path
+
+# Usage in your initialization logic
+TOKENIZER_PATH = load_model_from_hf("tokenizer.json")
+VISION_MODEL_PATH = load_model_from_hf("clip_vision_quantized.onnx")
+TEXT_MODEL_PATH = load_model_from_hf("clip_text_quantized.onnx")
 
 # --- CLIP Image Normalization Constants ---
 CLIP_IMAGE_MEAN = np.array([0.48145466, 0.4578275, 0.40821073], dtype=np.float32)

@@ -2,7 +2,7 @@ import axios from 'axios';
 import type { Item } from './types';
 
 const VERCEL_API_BASE = '/api';
-const CLOUDFLARE_WORKER_URL = 'YOUR_CLOUDFLARE_WORKER_URL'; // TODO: Replace with your worker URL
+const CLOUDFLARE_WORKER_URL = import.meta.env.VITE_CLOUDFLARE_WORKER_URL;
 
 export const api = {
   // Get embedding for an image from the Vercel backend
