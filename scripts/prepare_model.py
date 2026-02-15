@@ -10,6 +10,8 @@ import onnx
 from onnxruntime.quantization import quantize_dynamic, QuantType
 from onnxruntime.quantization.shape_inference import quant_pre_process
 
+from transformers import CLIPTokenizer
+
 
 def hf_download(destination: str):
 
@@ -153,11 +155,26 @@ def quantized_download(
                 os.remove(f)
         print("Cleanup complete.")
 
+def save_tokenizer(destination: str):
+    
+    print("\n--- Saving Tokenizer Files ---")
+    
+    tokenizer_dir = os.path.join(destination, "tokenizer")
+    os.makedirs(tokenizer_dir, exist_ok=True)
+    
+    tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
+    tokenizer.save_pretrained(tokenizer_dir)
+    print(f"Tokenizer files saved to {tokenizer_dir}")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         raise ValueError("Destination path is missing")
 
-    destination = os.path.join(sys.argv[1], "clip_model")
-    hf_download(destination)
-    quantized_download(destination)
+    # The script is run from the root, and "backend" is passed as an argument.
+    # So destination will be "backend".
+    destination_arg = sys.argv[1]
+    model_dest_dir = os.path.join(destination_arg, "clip_model")
+    
+    hf_download(model_dest_dir)
+    quantized_download(model_dest_dir)
+    save_tokenizer(model_dest_dir)

@@ -8,11 +8,12 @@ import requests
 from io import BytesIO
 from PIL import Image
 import onnxruntime as ort
-from transformers import CLIPTokenizer
+from tokenizers import Tokenizer
 from bs4 import BeautifulSoup
 
 # --- Model Paths ---
 MODEL_DIR = os.path.join(os.path.dirname(__file__), "clip_model")
+TOKENIZER_PATH = os.path.join(MODEL_DIR, "tokenizer", "tokenizer.json")
 VISION_MODEL_PATH = os.path.join(MODEL_DIR, "clip_vision_quantized.onnx")
 TEXT_MODEL_PATH = os.path.join(MODEL_DIR, "clip_text_quantized.onnx")
 
@@ -36,7 +37,10 @@ app.add_middleware(
 print("🔄 Loading ONNX models and tokenizer...")
 vision_session = ort.InferenceSession(VISION_MODEL_PATH)
 text_session = ort.InferenceSession(TEXT_MODEL_PATH)
-tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
+tokenizer = Tokenizer.from_file(TOKENIZER_PATH)
+# Set the truncation and padding parameters that were in the original tokenizer config
+tokenizer.enable_truncation(max_length=77)
+tokenizer.enable_padding(pad_id=0, pad_token="<|endoftext|>", length=77)
 print("✅ Models and tokenizer loaded.")
 
 # --- Pydantic Models ---
@@ -120,8 +124,8 @@ async def embed_url(request: UrlEmbedRequest):
         response.raise_for_status()
         page_text = get_text_from_html(response.text)
 
-        # 2. Tokenize text using Hugging Face transformers tokenizer
-        tokens = tokenizer(page_text, padding=True, truncation=True, return_tensors="np").input_ids
+        # 2. Tokenize text using the lightweight 'tokenizers' library
+        tokens = np.array([tokenizer.encode(page_text).ids])
 
         # 3. Run inference
         ort_inputs = {text_session.get_inputs()[0].name: tokens}

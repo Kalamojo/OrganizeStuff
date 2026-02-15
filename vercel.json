@@ -1,5 +1,9 @@
 {
   "version": 2,
+  "buildCommand": "npm run vercel-build",
+  "env": {
+    "VERCEL_BUILD_SYSTEM_REPORT": "1"
+  },
   "builds": [
     {
       "src": "frontend/package.json",
