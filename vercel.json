@@ -3,16 +3,21 @@
   "builds": [
     {
       "src": "frontend/package.json",
-      "use": "@vercel/static-build"
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "public"
+      }
     },
     {
-      "src": "build_all.sh",
-      "use": "@vercel/python"
+      "src": "backend/main.py",
+      "use": "@vercel/python",
+      "config": {
+        "buildCommand": "python -m venv /tmp/venv && . /tmp/venv/bin/activate && pip install --upgrade pip && pip install -r backend/requirements-build.txt && python scripts/prepare_model.py api"
+      }
     }
   ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "backend/main.py" },
-    { "source": "/assets/(.*)", "destination": "/frontend/assets/$1" },
-    { "source": "/(.*)", "destination": "/frontend/index.html" }
+    { "source": "/(.*)", "destination": "/public/index.html" }
   ]
 }
