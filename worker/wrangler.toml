@@ -1,0 +1,6 @@
+name = "organize-stuff-clustering"
+main = "src/index.py"
+compatibility_date = "2023-10-30"
+
+[build]
+command = "pip install -r requirements.txt -t src"

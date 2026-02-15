@@ -31,70 +31,25 @@ const CLUSTER_COLORS = [
 function App() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [items, setItems] = useState<Item[]>([]);
-  const [clusters, setClusters] = useState<Record<string, number>>({});
+  const [items, setItems] = useState<Record<string, Item>>({});
+  const [cmState, setCmState] = useState<any>({});
   const [draggedNode, setDraggedNode] = useState<Node | null>(null);
   const [dragStartPos, setDragStartPos] = useState<{ x: number; y: number } | null>(null);
   const [imageUrl, setImageUrl] = useState<string>('');
   const [isAddingImage, setIsAddingImage] = useState(false);
-  const [bookmarkUrl, setBookmarkUrl] = useState<string>('');
-  const [isAddingUrl, setIsAddingUrl] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
   const [changedItems, setChangedItems] = useState<Set<number>>(new Set());
   const [isPropagating, setIsPropagating] = useState(false);
 
-  // Load items from API
-  const loadItems = useCallback(async () => {
-    try {
-      const data = await api.getItems();
-      setItems(data.items);
-      setClusters(data.clusters);
-      updateNodesFromItems(data.items, data.clusters);
-    } catch (error) {
-      console.error('Failed to load items:', error);
-    }
-  }, []);
-
-  // Load items with animation - highlights changed items
-  const loadItemsAnimated = useCallback(async (oldItems: Item[]) => {
-    try {
-      setIsPropagating(true);
-
-      // Wait a bit to show "propagating" state
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      const data = await api.getItems();
-
-      // Find changed items
-      const changed = new Set<number>();
-      data.items.forEach(newItem => {
-        const oldItem = oldItems.find(i => i.id === newItem.id);
-        if (oldItem && oldItem.cluster !== newItem.cluster) {
-          changed.add(newItem.id);
-        }
-      });
-
-      // Highlight changed items
-      setChangedItems(changed);
-
-      // Update state
-      setItems(data.items);
-      setClusters(data.clusters);
-      updateNodesFromItems(data.items, data.clusters);
-
-      setIsPropagating(false);
-
-      // Clear highlights after animation
-      setTimeout(() => setChangedItems(new Set()), 2000);
-    } catch (error) {
-      console.error('Failed to load items:', error);
-      setIsPropagating(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadItems();
-  }, [loadItems]);
+  const updateUIFromState = (newItems: Record<string, Item>, newCmState: any) => {
+    const itemArray = Object.values(newItems);
+    const clusterSizes = Object.values(newCmState.clusters || {}).reduce((acc, c: any) => {
+        acc[c.id] = c.size;
+        return acc;
+    }, {});
+    setItems(newItems);
+    setCmState(newCmState);
+    updateNodesFromItems(itemArray, clusterSizes);
+  }
 
   // Convert items to React Flow nodes
   const updateNodesFromItems = (items: Item[], clusterSizes: Record<string, number>) => {
@@ -188,16 +143,6 @@ function App() {
     setNodes([...clusterNodes, ...itemNodes]);
   };
 
-  // Handle adding new random item
-  const handleAddItem = async () => {
-    try {
-      await api.addItem();
-      await loadItems();
-    } catch (error) {
-      console.error('Failed to add item:', error);
-    }
-  };
-
   // Handle adding image item
   const handleAddImage = async () => {
     if (!imageUrl.trim()) {
@@ -207,8 +152,17 @@ function App() {
 
     setIsAddingImage(true);
     try {
-      await api.addImageItem(imageUrl);
-      await loadItems();
+      // 1. Get embedding from Vercel
+      const embeddedItem = await api.embedImage(imageUrl);
+      embeddedItem.id = Date.now(); // Assign a unique ID on the frontend
+      
+      // 2. Send to Cloudflare for clustering
+      const newState = await api.postToWorker('CLUSTER_ITEM', {
+        state: { cm: cmState, items },
+        item: embeddedItem,
+      });
+
+      updateUIFromState(newState.items, newState.cm);
       setImageUrl('');
     } catch (error) {
       console.error('Failed to add image:', error);
@@ -218,89 +172,12 @@ function App() {
     }
   };
 
-  // Handle adding URL/bookmark
-  const handleAddUrl = async () => {
-    if (!bookmarkUrl.trim()) {
-      alert('Please enter a URL');
-      return;
-    }
-
-    setIsAddingUrl(true);
-    try {
-      await api.addUrlItem(bookmarkUrl);
-      await loadItems();
-      setBookmarkUrl('');
-    } catch (error) {
-      console.error('Failed to add URL:', error);
-      alert('Failed to add URL. Make sure the URL is valid and accessible.');
-    } finally {
-      setIsAddingUrl(false);
-    }
-  };
-
-  // Handle importing bookmarks from HTML file
-  const handleImportBookmarks = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsImporting(true);
-    try {
-      const text = await file.text();
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(text, 'text/html');
-      const links = doc.querySelectorAll('a[href]');
-
-      const urls = Array.from(links)
-        .map(link => ({
-          url: link.getAttribute('href') || '',
-          title: link.textContent || ''
-        }))
-        .filter(item => item.url.startsWith('http'));
-
-      console.log(`Found ${urls.length} bookmarks`);
-
-      let successCount = 0;
-      // Add bookmarks one by one and update UI after each
-      for (let i = 0; i < urls.length; i++) {
-        try {
-          await api.addUrlItem(urls[i].url, urls[i].title);
-          successCount++;
-          console.log(`Added ${i + 1}/${urls.length}: ${urls[i].title}`);
-
-          // Update UI immediately after each bookmark is added
-          await loadItems();
-        } catch (error) {
-          console.error(`Failed to add ${urls[i].url}:`, error);
-        }
-      }
-
-      alert(`Successfully imported ${successCount}/${urls.length} bookmarks!`);
-    } catch (error) {
-      console.error('Failed to import bookmarks:', error);
-      alert('Failed to import bookmarks. Make sure the file is a valid HTML bookmarks export.');
-    } finally {
-      setIsImporting(false);
-      // Reset file input
-      event.target.value = '';
-    }
-  };
-
-  // Handle recluster
-  const handleRecluster = async () => {
-    try {
-      await api.reclusterAll();
-      await loadItems();
-    } catch (error) {
-      console.error('Failed to recluster:', error);
-    }
-  };
-
   // Handle reset
   const handleReset = async () => {
     if (!confirm('Clear all items and start fresh?')) return;
     try {
-      await api.resetAll();
-      await loadItems();
+        const newState = await api.postToWorker('RESET', { state: { cm: cmState, items } });
+        updateUIFromState(newState.items, newState.cm);
     } catch (error) {
       console.error('Failed to reset:', error);
     }
@@ -362,33 +239,24 @@ function App() {
         }
       }
 
-      // If dropped on a different cluster, apply correction
-      if (targetCluster && targetCluster !== draggedNode.data.cluster) {
-        console.log(`Moving item ${node.id} to ${targetCluster}`);
-        try {
-          const oldItems = [...items]; // Save current state
-          await api.applyCorrection(Number(node.id), targetCluster);
-          await loadItemsAnimated(oldItems); // Reload with animation
-        } catch (error) {
-          console.error('Failed to apply correction:', error);
-        }
+      const correctionTarget = targetCluster || 'new_cluster';
+
+      try {
+        const newState = await api.postToWorker('APPLY_CORRECTION', {
+            state: { cm: cmState, items },
+            item_id: Number(node.id),
+            target_cluster: correctionTarget
+        });
+        updateUIFromState(newState.items, newState.cm);
+      } catch (error) {
+        console.error('Failed to apply correction:', error);
       }
-      // If dropped outside all clusters, create a new cluster
-      else if (!targetCluster) {
-        console.log(`Creating new cluster for item ${node.id}`);
-        try {
-          const oldItems = [...items]; // Save current state
-          await api.applyCorrection(Number(node.id), 'new_cluster');
-          await loadItemsAnimated(oldItems); // Reload with animation
-        } catch (error) {
-          console.error('Failed to create new cluster:', error);
-        }
-      }
+
 
       setDraggedNode(null);
       setDragStartPos(null);
     },
-    [draggedNode, dragStartPos, nodes, items, loadItemsAnimated]
+    [draggedNode, dragStartPos, nodes, items, cmState]
   );
 
   return (
@@ -428,20 +296,6 @@ function App() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '15px' }}>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button
-                  onClick={handleRecluster}
-                  style={{
-                    padding: '10px 20px',
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    backgroundColor: '#2196F3',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '5px',
-                  }}
-                >
-                  🔄 Recluster
-                </button>
-                <button
                   onClick={handleReset}
                   style={{
                     padding: '10px 20px',
@@ -455,33 +309,6 @@ function App() {
                 >
                   🗑️ Reset
                 </button>
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <label
-                  htmlFor="bookmark-import"
-                  style={{
-                    padding: '10px 20px',
-                    fontSize: '14px',
-                    cursor: isImporting ? 'wait' : 'pointer',
-                    backgroundColor: isImporting ? '#666' : '#9C27B0',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '5px',
-                    display: 'inline-block',
-                    textAlign: 'center',
-                  }}
-                >
-                  {isImporting ? '⏳ Importing...' : '📚 Import Bookmarks'}
-                </label>
-                <input
-                  id="bookmark-import"
-                  type="file"
-                  accept=".html"
-                  onChange={handleImportBookmarks}
-                  disabled={isImporting}
-                  style={{ display: 'none' }}
-                />
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
@@ -520,47 +347,10 @@ function App() {
                   </button>
                 </div>
               </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                <label style={{ fontSize: '12px', color: '#b0b0b0' }}>🔗 Add URL/Bookmark:</label>
-                <div style={{ display: 'flex', gap: '5px' }}>
-                  <input
-                    type="text"
-                    value={bookmarkUrl}
-                    onChange={(e) => setBookmarkUrl(e.target.value)}
-                    placeholder="https://example.com/article"
-                    style={{
-                      flex: 1,
-                      padding: '8px',
-                      fontSize: '14px',
-                      border: '1px solid #555',
-                      borderRadius: '4px',
-                      backgroundColor: '#3d3d3d',
-                      color: '#fff',
-                    }}
-                    onKeyPress={(e) => e.key === 'Enter' && handleAddUrl()}
-                  />
-                  <button
-                    onClick={handleAddUrl}
-                    disabled={isAddingUrl}
-                    style={{
-                      padding: '8px 16px',
-                      fontSize: '14px',
-                      cursor: isAddingUrl ? 'wait' : 'pointer',
-                      backgroundColor: isAddingUrl ? '#ccc' : '#9C27B0',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                    }}
-                  >
-                    {isAddingUrl ? '⏳' : '🔖 Add'}
-                  </button>
-                </div>
-              </div>
             </div>
             <div style={{ fontSize: '14px', color: '#b0b0b0' }}>
-              <div>📊 Items: {items.length}</div>
-              <div>🎯 Clusters: {Object.keys(clusters).length}</div>
+              <div>📊 Items: {Object.keys(items).length}</div>
+              <div>🎯 Clusters: {Object.keys(cmState.clusters || {}).length}</div>
               <div style={{ marginTop: '10px', fontStyle: 'italic', color: '#888' }}>
                 💡 Drag items between clusters to teach the algorithm!
               </div>

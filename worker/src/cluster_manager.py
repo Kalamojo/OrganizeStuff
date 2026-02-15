@@ -121,3 +121,17 @@ class ClusterManager:
 
     def get_new_cluster_id(self):
         return f"cluster_{self.next_cluster_id}"
+
+    def to_dict(self):
+        return {
+            "clusters": {cid: {"medoid": c.medoid.tolist(), "members": c.members, "size": c.size} for cid, c in self.clusters.items()},
+            "item_to_embedding": {k: v.tolist() for k, v in self.item_to_embedding.items()},
+            "next_cluster_id": self.next_cluster_id
+        }
+
+    def from_dict(self, data: dict):
+        self.clusters = {cid: Cluster(c["id"], np.array(c["medoid"]), c["members"], c["size"]) for cid, c in data.get("clusters", {}).items()}
+        self.item_to_embedding = {int(k): np.array(v) for k, v in data.get("item_to_embedding", {}).items()}
+        self.item_to_cluster = {item_id: self.clusters[cluster.id] for item_id, cluster in self.item_to_cluster.items()}
+        self.next_cluster_id = data.get("next_cluster_id", 0)
+        return self

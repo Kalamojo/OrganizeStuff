@@ -4,6 +4,10 @@ stenv/
 __pycache__/
 .ipynb_checkpoints/
 
-claude/
-CLAUDE_*.md
+node_modules/
+package-lock.json
 
+claude/
+CLAUDE*.md
+
+GEMINI*.md

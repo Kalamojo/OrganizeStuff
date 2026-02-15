@@ -1,58 +1,28 @@
 import axios from 'axios';
-import type { ItemsResponse, CorrectionRequest } from './types';
+import type { Item, ItemsResponse } from './types';
 
-const API_BASE = 'http://localhost:8000/api';
+const VERCEL_API_BASE = '/api';
+const CLOUDFLARE_WORKER_URL = 'YOUR_CLOUDFLARE_WORKER_URL'; // TODO: Replace with your worker URL
 
 export const api = {
-  // Get all items
-  getItems: async (): Promise<ItemsResponse> => {
-    const response = await axios.get(`${API_BASE}/items`);
-    return response.data;
-  },
-
-  // Add a new random item
-  addItem: async () => {
-    const response = await axios.post(`${API_BASE}/items`);
-    return response.data;
-  },
-
-  // Apply human correction
-  applyCorrection: async (itemId: number, targetCluster: string): Promise<ItemsResponse> => {
-    const request: CorrectionRequest = {
-      item_id: itemId,
-      target_cluster: targetCluster,
-    };
-    const response = await axios.post(`${API_BASE}/correct`, request);
-    return response.data;
-  },
-
-  // Recluster all items
-  reclusterAll: async (): Promise<ItemsResponse> => {
-    const response = await axios.post(`${API_BASE}/recluster`);
-    return response.data;
-  },
-
-  // Add image item
-  addImageItem: async (imageUrl: string, metadata?: string) => {
-    const response = await axios.post(`${API_BASE}/embed_image`, {
+  // Get embedding for an image from the Vercel backend
+  embedImage: async (imageUrl: string, metadata?: string): Promise<Item> => {
+    const response = await axios.post(`${VERCEL_API_BASE}/embed_image`, {
       image_url: imageUrl,
       metadata,
     });
     return response.data;
   },
+  
+  // --- Clustering operations (to be handled by Cloudflare Worker) ---
 
-  // Add URL/bookmark item
-  addUrlItem: async (url: string, metadata?: string) => {
-    const response = await axios.post(`${API_BASE}/embed_url`, {
-      url: url,
-      metadata,
+  // This function will now be responsible for all communication with the worker
+  // It will send the current state and the desired action
+  postToWorker: async (action: string, payload: any): Promise<any> => {
+    const response = await axios.post(CLOUDFLARE_WORKER_URL, {
+        action,
+        ...payload
     });
-    return response.data;
-  },
-
-  // Reset all items
-  resetAll: async () => {
-    const response = await axios.post(`${API_BASE}/reset`);
     return response.data;
   },
 };
