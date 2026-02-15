@@ -1,0 +1,7 @@
+jupyterlab
+polars
+vowpal-wabbit-next
+matplotlib
+dash
+plotly
+
