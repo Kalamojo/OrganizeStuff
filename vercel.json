@@ -3,6 +3,7 @@
   "buildCommand": "npm run build",
   "builds": [
     { "src": "package.json", "use": "@vercel/static-build" },
+    { "src": "frontend/package.json", "use": "@vercel/static-build" },
     { "src": "backend/main.py", "use": "@vercel/python" }
   ],
   "rewrites": [
