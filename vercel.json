@@ -7,7 +7,8 @@
     { "src": "backend/main.py", "use": "@vercel/python" }
   ],
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/backend/main.py" },
+    { "source": "/api/(.*)", "destination": "backend/main.py" },
+    { "source": "/assets/(.*)", "destination": "/assets/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
