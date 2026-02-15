@@ -4,18 +4,6 @@ set -e
 
 echo "--- VERCEL BUILD SCRIPT START ---"
 
-# 1. Build Frontend
-echo "--- Building frontend ---"
-# Navigate to the frontend directory, install dependencies, and build
-cd frontend
-npm install
-npm run build
-cd .. # Go back to the project root
-
-# 2. Move frontend output to the standard 'public' directory
-echo "--- Moving frontend output to /public ---"
-mv frontend/dist public
-
 # 3. Prepare Backend Assets (Models and Tokenizer)
 echo "--- Preparing backend assets ---"
 # Install the heavy, build-time-only dependencies

@@ -6,12 +6,8 @@
       "use": "@vercel/static-build"
     },
     {
-      "src": "backend/main.py",
-      "use": "@vercel/static-build",
-      "config": {
-        "buildCommand": "pip install -r backend/requirements-build.txt && python scripts/prepare_model.py api && pip install -r backend/requirements.txt",
-        "maxLambdaSize": "50mb"
-      }
+      "src": "build_all.sh",
+      "use": "@vercel/static-build"
     }
   ],
   "rewrites": [
