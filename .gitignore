@@ -4,3 +4,6 @@ stenv/
 __pycache__/
 .ipynb_checkpoints/
 
+claude/
+CLAUDE_*.md
+

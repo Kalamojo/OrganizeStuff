@@ -28,9 +28,11 @@ class ClusterManager:
         """Assign item to cluster, update membership tracking"""
         if item_idx in self.item_to_cluster:
             old_cluster_id = self.item_to_cluster[item_idx].id
-            self.clusters[old_cluster_id].members.remove(item_idx)
-            self.clusters[old_cluster_id].size -= 1
-        
+            # Defensive: only remove if cluster still exists and item is actually in members
+            if old_cluster_id in self.clusters and item_idx in self.clusters[old_cluster_id].members:
+                self.clusters[old_cluster_id].members.remove(item_idx)
+                self.clusters[old_cluster_id].size -= 1
+
         self.item_to_cluster[item_idx] = self.clusters[cluster_id]
         self.clusters[cluster_id].members.append(item_idx)
         self.clusters[cluster_id].size += 1
@@ -97,7 +99,14 @@ class ClusterManager:
             else:
                 to_remove.append(cluster.id)
 
+        # Clean up empty clusters AND remove stale item_to_cluster references
         for cluster_id in to_remove:
+            # Remove any items that still reference this cluster
+            items_to_clean = [item_id for item_id, cluster in self.item_to_cluster.items()
+                             if cluster.id == cluster_id]
+            for item_id in items_to_clean:
+                del self.item_to_cluster[item_id]
+
             del self.clusters[cluster_id]
 
     def get_new_cluster_id(self):

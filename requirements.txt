@@ -4,4 +4,6 @@ vowpal-wabbit-next
 matplotlib
 dash
 plotly
+dash-cytoscape>=1.0.0
+networkx
 
