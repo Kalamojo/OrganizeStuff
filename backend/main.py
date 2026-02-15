@@ -1,9 +1,15 @@
+import os
+
+# 1. CRITICAL: Disable Xet to prevent read-only file system errors
+os.environ["HF_HUB_DISABLE_XET"] = "1"
+# 2. Redirect the home/cache directory to Vercel's writable /tmp
+os.environ["HF_HOME"] = "/tmp"
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import numpy as np
-import os
 import requests
 from io import BytesIO
 from PIL import Image
