@@ -2,7 +2,7 @@ import axios from 'axios';
 import type { Item } from './types';
 
 const VERCEL_API_BASE = '/api';
-const CLOUDFLARE_WORKER_URL = import.meta.env.VITE_CLOUDFLARE_WORKER_URL;
+const CLOUDFLARE_WORKER_URL = import.meta.env.VITE_CLOUDFLARE_WORKER_URL || "https://ts-worker.bandit-cluster.workers.dev";
 if (!CLOUDFLARE_WORKER_URL) {
   throw new Error("Missing VITE_CLOUDFLARE_WORKER_URL (not injected at build time).");
 }
