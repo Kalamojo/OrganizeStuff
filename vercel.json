@@ -1,14 +1,10 @@
 {
   "version": 2,
-  "buildCommand": "npm run vercel-build",
-  "env": {
-    "VERCEL_BUILD_SYSTEM_REPORT": "1"
-  },
+  "buildCommand": "bash build_all.sh",
   "builds": [
     {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build",
-      "config": { "distDir": "dist" }
+      "src": "frontend/dist",
+      "use": "@vercel/static"
     },
     {
       "src": "backend/main.py",
@@ -17,7 +13,7 @@
   ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "backend/main.py" },
-    { "source": "/assets/(.*)", "destination": "/frontend/assets/$1" },
-    { "source": "/(.*)", "destination": "/frontend/index.html" }
+    { "source": "/assets/(.*)", "destination": "/assets/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
