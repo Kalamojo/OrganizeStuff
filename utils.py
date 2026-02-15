@@ -1,7 +1,7 @@
 import random
 import numpy as np
 import vowpal_wabbit_next as vw
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 def sample_pmf(pmf: List[Tuple[int, float]]) -> Tuple[int, float]:
     """Safely samples an action index from Vowpal Wabbit's PMF output."""
@@ -59,11 +59,11 @@ def predict_cluster(workspace: vw.Workspace, parser: vw.TextFormatParser,
     """
     Fetches the available clusters, formats the context, and asks VW to predict the best fit.
     """
-    print("Current cm clusters:", cm.clusters)
+    #print("Current cm clusters:", cm.clusters)
     # Note: cm.get_vw_actions automatically seeds a new cluster for this item.
     actions = cm.get_vw_actions(item_idx, item_features)
-    [print("v") for i in range(4)]
-    print("actions:", actions)
+    #[print("v") for i in range(4)]
+    #print("actions:", actions)
     
     # Format and parse
     vw_example_str = format_vw_adf_string(cm, item_features, actions)
@@ -72,12 +72,12 @@ def predict_cluster(workspace: vw.Workspace, parser: vw.TextFormatParser,
     
     # Predict
     pmf = workspace.predict_one(parsed_lines)
-    print("pmf:", pmf)
+    #print("pmf:", pmf)
     
     # Sample the probability mass function to choose an action
     chosen_action_idx, prob = sample_pmf(pmf)
     chosen_action = actions[chosen_action_idx]
-    print("action stuff:", chosen_action, prob)
+    #print("action stuff:", chosen_action, prob)
 
     is_new = chosen_action.get("is_new", False)
     
@@ -146,12 +146,12 @@ def apply_human_correction(workspace: vw.Workspace, parser: vw.TextFormatParser,
     cost = -1.0
     prob = correct_prob
     
-    print("human doing stuff")
+    #print("human doing stuff")
 
-    print("cm clusters in human right before learning:", cm.clusters)
+    #print("cm clusters in human right before learning:", cm.clusters)
     learn_and_update(workspace, parser, cm, item_idx, item_features, actions, 
                      correct_cluster_id, prob, cost, is_new_correct_cluster)
-    print("cm clusters in human right after learning:", cm.clusters)
+    #print("cm clusters in human right after learning:", cm.clusters)
     return correct_cluster_id
 
 def calculate_cost(cm, item_features, chosen_cluster_id, is_new: bool, new_cluster_penalty=0.2, spatial_scale=0.3, size_scale=0.3):
@@ -183,7 +183,7 @@ def get_confidence_margin(pmf, chosen_idx):
         return probs[0][1] - probs[1][1]  # Top minus 2nd place
     return 1.0  # Sole option = maximum confidence
 
-def full_cluster_propagation(workspace, parser, cm, items):
+def full_cluster_propagation_dash(workspace, parser, cm, items):
     """
     FULL PROPAGATION with MARGIN-BASED confidence. Updates only when 
     top prediction beats 2nd-place by >15% margin AND cluster changes.
@@ -228,4 +228,41 @@ def full_cluster_propagation(workspace, parser, cm, items):
     
     #cm.balance_clusters()
     print(f"✅ Propagation complete: {updates_made} points reassigned (margin > 0.15)")
+    return items
+
+def full_cluster_propagation(workspace, parser, cm, items: Dict[int, Dict]) -> Dict[int, Dict]:
+    """
+    Streamlit-optimized propagation: Updates ONLY low-confidence items with >15% margin.
+    No print spam, returns updated items dict.
+    """
+    if not items:
+        return items
+    
+    updates_made = 0
+    item_ids = list(items.keys())
+    
+    # Only process items without clusters or low confidence (faster)
+    for item_id in item_ids:
+        if item_id not in cm.item_to_cluster or items[item_id].get('confidence', 0) < 0.6:
+            features = np.array(items[item_id]['features'])
+            old_cluster = items[item_id].get('cluster')
+            
+            # Get prediction WITHOUT learning
+            chosen_action, prob, pmf, actions, chosen_idx, is_new = predict_cluster(
+                workspace, parser, cm, item_id, features, learn=False
+            )
+
+            margin = get_confidence_margin(pmf, chosen_idx)
+            
+            # Update only if confident AND cluster changed
+            if (old_cluster != chosen_action["id"] and margin > 0.15):
+                cost = calculate_cost(cm, features, chosen_action["id"], is_new)
+                learn_and_update(workspace, parser, cm, item_id, features, 
+                               actions, chosen_action["id"], prob, cost, is_new)
+                
+                items[item_id]['cluster'] = chosen_action["id"]
+                items[item_id]['confidence'] = prob
+                updates_made += 1
+    
+    cm.balance_clusters()  # Optional - disabled for stable colors
     return items

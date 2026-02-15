@@ -6,7 +6,7 @@ import pandas as pd
 import numpy as np
 from cluster_manager import ClusterManager
 from utils import (predict_cluster, apply_human_correction, 
-                  calculate_cost, full_cluster_propagation)
+                  calculate_cost, full_cluster_propagation_dash)
 import vowpal_wabbit_next as vw
 
 # Global state - NO initial clusters!
@@ -268,7 +268,7 @@ def apply_correction(n_clicks, selected_point, target_cluster, items_store):
         # 2. GLOBAL PROPAGATION - THE MAGIC!
         print("correction applied")
         print(items)
-        items = full_cluster_propagation(workspace, parser, cm, items)
+        items = full_cluster_propagation_dash(workspace, parser, cm, items)
         cm.balance_clusters()
         
         return items, html.Div(f"✅ {item_id} → {cluster_id}! ({len(items)} total)", 
