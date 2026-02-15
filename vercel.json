@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "buildCommand": "npm run build"
   "builds": [
     {
       "src": "frontend/package.json",
@@ -10,8 +11,7 @@
       "use": "@vercel/python",
       "config": {
         "includeFiles": [
-          "backend/clip_model/**",
-          "backend/tokenizer/**"
+          "backend/clip_model/**"
         ]
       }
     }
