@@ -1,24 +1,25 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Dict, List, Optional
+from typing import List, Optional
 import numpy as np
 import os
 import requests
 from io import BytesIO
 from PIL import Image
 import onnxruntime as ort
-from . import prepare_model
+import open_clip
+from bs4 import BeautifulSoup
 
-# --- Model Preparation ---
-# The model is now prepared during the build step (see build.sh)
-MODEL_DIR_NAME = "clip_model"
-QUANTIZED_MODEL_PATH = os.path.join(os.path.dirname(__file__), MODEL_DIR_NAME, "clip_quantized.onnx")
+# --- Model Paths ---
+MODEL_DIR = os.path.join(os.path.dirname(__file__), "clip_model")
+VISION_MODEL_PATH = os.path.join(MODEL_DIR, "clip_vision_quantized.onnx")
+TEXT_MODEL_PATH = os.path.join(MODEL_DIR, "clip_text_quantized.onnx")
 
 # --- FastAPI App ---
 app = FastAPI(title="Embedding API")
 
-# CORS for React frontend
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://localhost:3000"],
@@ -27,12 +28,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Load the quantized ONNX model
-print("🔄 Loading Quantized ONNX CLIP model...")
-ort_session = ort.InferenceSession(QUANTIZED_MODEL_PATH)
-print(f"✅ ONNX model loaded from {QUANTIZED_MODEL_PATH}")
+# --- Model and Tokenizer Loading ---
+print("🔄 Loading ONNX models and tokenizer...")
+vision_session = ort.InferenceSession(VISION_MODEL_PATH)
+text_session = ort.InferenceSession(TEXT_MODEL_PATH)
+tokenizer = open_clip.get_tokenizer('ViT-B-32')
+print("✅ Models and tokenizer loaded.")
 
-# Pydantic models
+# --- Pydantic Models ---
 class Item(BaseModel):
     id: int
     features: List[float]
@@ -49,17 +52,30 @@ class UrlEmbedRequest(BaseModel):
     url: str
     metadata: Optional[str] = None
 
-# API Endpoints
+# --- Helper Functions ---
+def get_text_from_html(html_content: str) -> str:
+    soup = BeautifulSoup(html_content, 'html.parser')
+    # Remove script and style elements
+    for script_or_style in soup(["script", "style"]):
+        script_or_style.decompose()
+    # Get text
+    text = soup.get_text()
+    # Break into lines and remove leading/trailing space on each
+    lines = (line.strip() for line in text.splitlines())
+    # Break multi-headlines into a line each
+    chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+    # Drop blank lines
+    text = '\n'.join(chunk for chunk in chunks if chunk)
+    return text
+
+# --- API Endpoints ---
 @app.get("/")
 async def root():
-    return {
-        "message": "Embedding API",
-        "docs": "/docs",
-    }
+    return {"message": "Embedding API", "docs": "/docs"}
 
 @app.post("/api/embed_image", response_model=Item)
 async def embed_image(request: ImageEmbedRequest):
-    """Embed an image using the quantized ONNX CLIP model"""
+    """Embed an image using the quantized ONNX CLIP vision model"""
     try:
         response = requests.get(request.image_url, timeout=10)
         response.raise_for_status()
@@ -71,8 +87,8 @@ async def embed_image(request: ImageEmbedRequest):
         image = image.transpose(2, 0, 1)
         image_tensor = np.expand_dims(image, axis=0)
 
-        ort_inputs = {ort_session.get_inputs()[0].name: image_tensor}
-        ort_outs = ort_session.run(None, ort_inputs)
+        ort_inputs = {vision_session.get_inputs()[0].name: image_tensor}
+        ort_outs = vision_session.run(None, ort_inputs)
         image_features = ort_outs[0]
         
         norm = np.linalg.norm(image_features, axis=1, keepdims=True)
@@ -87,24 +103,33 @@ async def embed_image(request: ImageEmbedRequest):
             image_url=request.image_url,
             full_embedding=full_embedding.tolist()
         )
-
     except Exception as e:
         print(f"❌ Error embedding image: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to embed image: {str(e)}")
 
 @app.post("/api/embed_url", response_model=Item)
 async def embed_url(request: UrlEmbedRequest):
-    """(Placeholder) Embed a URL"""
+    """Embed a URL's text content using the quantized ONNX CLIP text model"""
     try:
-        # In a real implementation, you would fetch the URL content,
-        # extract text, and use a text embedding model.
-        # For now, we generate a random vector to make the workflow functional.
-        embedding_size = 512 # Matching CLIP ViT-B/32 embedding size
-        full_embedding = np.random.rand(embedding_size).astype(np.float32)
-        norm = np.linalg.norm(full_embedding)
-        full_embedding = (full_embedding / norm).flatten()
+        # 1. Fetch and parse HTML
+        response = requests.get(request.url, timeout=10)
+        response.raise_for_status()
+        page_text = get_text_from_html(response.text)
 
-        print(f"🔗 (Placeholder) Embedded URL: {request.url[:60]}...")
+        # 2. Tokenize text
+        # Truncate text to avoid overly long sequences
+        tokens = tokenizer(page_text, context_length=77).cpu().numpy()
+
+        # 3. Run inference
+        ort_inputs = {text_session.get_inputs()[0].name: tokens}
+        ort_outs = text_session.run(None, ort_inputs)
+        text_features = ort_outs[0]
+
+        # 4. Normalize
+        norm = np.linalg.norm(text_features, axis=1, keepdims=True)
+        full_embedding = (text_features / norm).flatten()
+        
+        print(f"🔗 Embedded URL: {request.url[:60]}... → {full_embedding.shape}")
 
         return Item(
             id=-1,
@@ -113,7 +138,6 @@ async def embed_url(request: UrlEmbedRequest):
             url=request.url,
             full_embedding=full_embedding.tolist()
         )
-
     except Exception as e:
         print(f"❌ Error embedding url: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to embed url: {str(e)}")

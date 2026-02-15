@@ -1,5 +1,8 @@
 {
   "dependencies": {
     "@google/gemini-cli": "^0.28.2"
+  },
+  "scripts": {
+    "build": "bash backend/build.sh"
   }
 }
