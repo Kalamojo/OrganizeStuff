@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "pip install --break-system-packages -r backend/requirements-build.txt && npm run build",
+  "buildCommand": "npm run build",
   "builds": [
     { "src": "package.json", "use": "@vercel/static-build" },
     { "src": "backend/main.py", "use": "@vercel/python" }
