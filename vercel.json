@@ -2,15 +2,15 @@
   "version": 2,
   "builds": [
     {
-      "src": "frontend/package.json",
-      "use": "@vercel/static-build"
-    },
-    {
       "src": "backend/main.py",
       "use": "@vercel/python",
       "config": {
-        "buildCommand": "python -m venv /tmp/venv && . /tmp/venv/bin/activate && pip install --upgrade pip && pip install -r backend/requirements-build.txt && python scripts/prepare_model.py api"
+        "buildCommand": "echo '=== BUILD DEBUG ===' && pwd && ls -la && mkdir -p api/clip_model && echo 'test file' > api/clip_model/test.txt && ls -la api/"
       }
+    },
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build"
     }
   ],
   "rewrites": [
