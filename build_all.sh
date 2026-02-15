@@ -12,7 +12,11 @@ npm install
 npm run build
 cd .. # Go back to the project root
 
-# 2. Prepare Backend Assets (Models and Tokenizer)
+# 2. Move frontend output to the standard 'public' directory
+echo "--- Moving frontend output to /public ---"
+mv frontend/dist public
+
+# 3. Prepare Backend Assets (Models and Tokenizer)
 echo "--- Preparing backend assets ---"
 # Install the heavy, build-time-only dependencies
 pip install -r backend/requirements-build.txt
