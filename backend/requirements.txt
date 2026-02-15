@@ -1,9 +1,7 @@
-fastapi
+fastapi[standard-no-fastapi-cloud-cli]
 onnxruntime
 numpy
 pillow
 requests
 beautifulsoup4
-html5lib
-lxml
 tokenizers
