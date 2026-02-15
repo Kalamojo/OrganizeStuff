@@ -1,0 +1,15 @@
+[project]
+name = "organize-stuff-clustering"
+version = "0.1.0"
+description = "Vowpal Wabbit Clustering Worker"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy",
+    "vowpal-wabbit-next"
+]
+
+[dependency-groups]
+dev = [
+    "workers-py",
+    "workers-runtime-sdk"
+]
