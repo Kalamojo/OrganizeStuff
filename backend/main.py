@@ -34,6 +34,7 @@ def load_model_from_hf(filename):
             repo_id="Kalamojo/cluster-bandits",
             filename=filename,
             local_dir="/tmp",
+            local_dir_use_symlinks=False,
             token=os.environ.get("HF_TOKEN") # Use a Vercel Env Var for private repos
         )
     return target_path
